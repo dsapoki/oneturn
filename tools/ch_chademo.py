@@ -14,7 +14,15 @@ JOYA = {"CH*360": "Energie 360°", "CH*CCC": "MOVE", "CH*SUI": "Swisscharge"}   
 
 
 def name_of(e):
-    names = {n.get("lang"): n.get("value") for n in e.get("ChargingStationNames") or []}
+    raw = e.get("ChargingStationNames") or []
+    if isinstance(raw, (str, dict)):   # a few operators send one name or one object instead of a list
+        raw = [raw]
+    names = {}
+    for n in raw:
+        if isinstance(n, dict):
+            names[n.get("lang")] = n.get("value")
+        elif isinstance(n, str):
+            names.setdefault("en", n)
     return (names.get("en") or names.get("fr") or names.get("de") or next(iter(names.values()), "") or "").strip()
 
 
@@ -44,7 +52,7 @@ def main():
             nm = name_of(e)
             joya = op_id in JOYA or "joya" in op_name.lower()
             brand = "GOFAST" if re.search(r"gofast", nm, re.I) else JOYA.get(op_id, op_name)
-            ad = e.get("Address") or {}
+            ad = e.get("Address") if isinstance(e.get("Address"), dict) else {}
             found.append(dict(i=e.get("ChargingStationId") or e.get("EvseID"), n=nm, lat=round(lat, 6), lon=round(lon, 6),
                               a=", ".join(x for x in [ad.get("Street"), ad.get("City")] if x),
                               o=("JOYA (" + brand + ")") if joya else op_name, j=1 if joya else 0, k=dc_kw(e), q=1))
