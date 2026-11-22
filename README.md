@@ -9,6 +9,7 @@ What the frame adds:
 - Export in Settings opens the share sheet (Save to Files, AirDrop, Mail);
 - links to other websites open in Safari;
 - the last loaded version keeps working without mobile data (offline copy).
+- while driving, a floating window (picture in picture) with the next turn, distance, arrival time and charge on arrival when you switch to another app; its full-screen button brings OneTurn back. The phone keeps following the car in the background during a drive (blue location marker at the top).
 
 ## Download
 

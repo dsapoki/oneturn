@@ -26,11 +26,15 @@ targets:
         # Only this site opens inside the app. It also lets the app keep its own offline copy (service worker).
         WKAppBoundDomains:
           - alpineops.eu
+        # location: keep following the car in the background while driving; audio: the floating window (picture in picture)
+        UIBackgroundModes:
+          - location
+          - audio
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: eu.alpineops.oneturn
-        MARKETING_VERSION: "1.0"
+        MARKETING_VERSION: "1.1"
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

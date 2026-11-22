@@ -14,6 +14,10 @@ final class WebViewController: UIViewController {
     private var wantsLocation = false
     private var offline: UIView?
     private var downloads: [ObjectIdentifier: URL] = [:]
+    private let guide = FloatingGuide()       // floating window with the next turn while you are in another app
+    private var tracker: GuideTracker?        // set while driving
+    private var lastFix: CLLocation?
+    private var guideTimer: Timer?
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .darkContent }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .allButUpsideDown }
@@ -27,6 +31,7 @@ final class WebViewController: UIViewController {
         let handler = WeakHandler(self)
         scripts.add(handler, name: "geo")
         scripts.add(handler, name: "wake")
+        scripts.add(handler, name: "nav")
         config.userContentController = scripts
 
         web = WKWebView(frame: .zero, configuration: config)
@@ -44,6 +49,7 @@ final class WebViewController: UIViewController {
         web.frame = root.bounds
         web.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         root.addSubview(web)
+        guide.attach(to: root)
         view = root
 
         location.delegate = self
@@ -55,6 +61,39 @@ final class WebViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         web.load(URLRequest(url: Self.home))
+        NotificationCenter.default.addObserver(self, selector: #selector(appActive), name: UIApplication.didBecomeActiveNotification, object: nil)
+    }
+
+    @objc private func appActive() { guide.appBecameActive() }
+
+    // MARK: - Driving: the route from the page, followed here so the floating window keeps up in the background
+
+    private func navStart(_ route: GuideRoute) {
+        tracker = GuideTracker(route)
+        location.allowsBackgroundLocationUpdates = true      // keep following the car when you leave the app
+        location.showsBackgroundLocationIndicator = true
+        if location.authorizationStatus == .authorizedWhenInUse || location.authorizationStatus == .authorizedAlways { location.startUpdatingLocation() }
+        guide.start(guideState())
+        guideTimer?.invalidate()
+        guideTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.refreshGuide() }   // arrival time moves on even when standing still
+    }
+
+    private func navEnd() {
+        tracker = nil
+        guideTimer?.invalidate(); guideTimer = nil
+        guide.stop()
+        location.allowsBackgroundLocationUpdates = false
+        if !wantsLocation { location.stopUpdatingLocation() }
+    }
+
+    private func guideState() -> GuideState {
+        guard let t = tracker, let fix = lastFix ?? location.location else { return GuideState() }
+        return t.state(at: fix)
+    }
+
+    private func refreshGuide() {
+        guard tracker != nil else { return }
+        guide.show(guideState())
     }
 
     // MARK: - No connection at launch (and no saved copy yet)
@@ -116,6 +155,13 @@ extension WebViewController: WKScriptMessageHandler {
             if (body["op"] as? String) == "start" { startLocation() } else { stopLocation() }
         case "wake":
             UIApplication.shared.isIdleTimerDisabled = (body["on"] as? Bool) ?? false
+        case "nav":
+            switch body["op"] as? String {
+            case "route": if let r = GuideRoute(body) { navStart(r) }
+            case "status": tracker?.update(extra: body["extra"] as? Double, arr: body["arr"] as? Int); refreshGuide()
+            case "end": navEnd()
+            default: break
+            }
         default:
             break
         }
@@ -151,7 +197,7 @@ extension WebViewController: CLLocationManagerDelegate {
 
     private func stopLocation() {
         wantsLocation = false
-        location.stopUpdatingLocation()
+        if tracker == nil { location.stopUpdatingLocation() }   // still driving: the floating window needs it
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -167,7 +213,10 @@ extension WebViewController: CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        if let last = locations.last { send(last) }
+        guard let last = locations.last else { return }
+        lastFix = last
+        if UIApplication.shared.applicationState != .background { send(last) }   // the page is paused in the background
+        refreshGuide()
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
