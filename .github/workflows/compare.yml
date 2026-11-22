@@ -1,0 +1,8 @@
+name: Compare OCM and federal (one-off)
+on: workflow_dispatch
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/compare_ocm.py
