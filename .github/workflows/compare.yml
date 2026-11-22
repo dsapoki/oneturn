@@ -5,4 +5,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Open Charge Map export, Swiss stations only
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/openchargemap/ocm-export ocm-export
+          cd ocm-export && git sparse-checkout set --no-cone '/data/CH/*' '/README*' && ls && ls data | head
       - run: python3 tools/compare_ocm.py

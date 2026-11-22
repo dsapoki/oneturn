@@ -1,11 +1,20 @@
 """One-off: Swiss CHAdeMO stations in Open Charge Map vs the federal list (data/ch-chademo.json)."""
 import json, math, urllib.request, collections
 URL = "https://api.openchargemap.io/v3/poi/?output=json&countrycode=CH&connectiontypeid=2&maxresults=5000&compact=true&verbose=false"
-req = urllib.request.Request(URL, headers={"User-Agent": "OneTurn-compare/1.0"})
+import glob, os
+# Open Charge Map's own export (github.com/openchargemap/ocm-export, one file per station), Swiss part only
+files = glob.glob("ocm-export/data/CH/*.json") or glob.glob("ocm-export/data/**/CH/*.json", recursive=True)
+print("export files", len(files), "| layout sample", sorted(os.listdir("ocm-export"))[:10], sorted(os.listdir("ocm-export/data"))[:5] if os.path.isdir("ocm-export/data") else "")
+pois = []
+for f in files:
+    p = json.load(open(f))
+    if any((c.get("ConnectionTypeID") == 2) for c in (p.get("Connections") or [])):
+        pois.append(p)
 try:
-    pois = json.loads(urllib.request.urlopen(req, timeout=120).read())
-except Exception as e:
-    print("OCM fetch failed:", e); raise SystemExit(0)
+    last = max(((p.get("DateLastStatusUpdate") or "") for p in pois), default="")
+    print("latest status update in export:", last)
+except Exception:
+    pass
 fed = json.load(open("data/ch-chademo.json"))["stations"]
 print("OCM CHAdeMO POIs in CH:", len(pois), "| federal sites:", len(fed))
 def d(a, b, c, e):
