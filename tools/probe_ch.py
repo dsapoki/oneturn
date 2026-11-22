@@ -1,8 +1,9 @@
 """One-off look at the Swiss federal charging-station data (BFE/SFOE): structure, operators, CHAdeMO, any price fields."""
-import json, urllib.request, collections, sys
+import json, urllib.request, collections, sys, gzip
 URL = "https://data.geo.admin.ch/ch.bfe.ladestellen-elektromobilitaet/data/oicp/ch.bfe.ladestellen-elektromobilitaet.json"
 raw = urllib.request.urlopen(URL, timeout=120).read()
 print("bytes", len(raw))
+if raw[:2] == b"\x1f\x8b": raw = gzip.decompress(raw); print("unzipped", len(raw))
 d = json.loads(raw)
 print("top keys", list(d)[:10])
 recs = d["EVSEData"]
