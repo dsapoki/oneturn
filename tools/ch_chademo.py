@@ -6,6 +6,7 @@ import datetime
 import gzip
 import json
 import math
+import collections
 import re
 import urllib.request
 
@@ -39,11 +40,15 @@ def main():
     if raw[:2] == b"\x1f\x8b":
         raw = gzip.decompress(raw)
     data = json.loads(raw)
-    found = []
+    found, access = [], collections.Counter()
     for block in data["EVSEData"]:
         op_id, op_name = block.get("OperatorID") or "", block.get("OperatorName") or ""
         for e in block.get("EVSEDataRecord") or []:
-            if "CHAdeMO" not in (e.get("Plugs") or []) or "public" not in (e.get("Accessibility") or "").lower():
+            if "CHAdeMO" not in (e.get("Plugs") or []):
+                continue
+            acc = str(e.get("Accessibility") or "")
+            access[acc] += 1
+            if re.search(r"private|restricted", acc, re.I):   # only stations anyone can use
                 continue
             try:
                 lat, lon = [float(v) for v in e["GeoCoordinates"]["Google"].split()]
@@ -51,7 +56,8 @@ def main():
                 continue
             nm = name_of(e)
             joya = op_id in JOYA or "joya" in op_name.lower()
-            brand = "GOFAST" if re.search(r"gofast", nm, re.I) else JOYA.get(op_id, op_name)
+            brand = next((b for w, b in (("gofast", "GOFAST"), ("move", "MOVE"), ("swisscharge", "Swisscharge")) if re.search(w, nm, re.I)),
+                         JOYA.get(op_id, op_name))
             ad = e.get("Address") if isinstance(e.get("Address"), dict) else {}
             found.append(dict(i=e.get("ChargingStationId") or e.get("EvseID"), n=nm, lat=round(lat, 6), lon=round(lon, 6),
                               a=", ".join(x for x in [ad.get("Street"), ad.get("City")] if x),
@@ -73,6 +79,7 @@ def main():
                day=datetime.date.today().isoformat(), stations=sites)
     with open("data/ch-chademo.json", "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+    print("access:", dict(access))
     print(len(found), "CHAdeMO points,", len(sites), "sites,", sum(s["j"] for s in sites), "JOYA sites")
 
 
