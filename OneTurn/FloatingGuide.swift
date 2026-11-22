@@ -65,8 +65,10 @@ final class GuideTracker {
             }
             return best
         }
-        var hit = nearest(max(0, last - 30), min(n - 2, last + 800))   // near where we were: fast, and never jumps to a far part of the line
-        if hit.d > 150 { hit = nearest(0, n - 2) }
+        // a charging stop not reached yet: only the way there counts (the way back is often the same road)
+        let lastSeg = r.ci >= 1 ? min(n - 2, r.ci - 1) : n - 2
+        var hit = nearest(max(0, min(lastSeg, last - 30)), min(lastSeg, last + 800))   // near where we were: fast, never jumps far along the line
+        if hit.d > 150 { hit = nearest(0, lastSeg) }
         last = hit.k
         let along = r.cum[hit.k] + (r.cum[hit.k + 1] - r.cum[hit.k]) * hit.f
         let tNow = r.t[hit.k] + (r.t[hit.k + 1] - r.t[hit.k]) * hit.f
