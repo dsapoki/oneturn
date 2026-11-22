@@ -1,0 +1,35 @@
+name: Swiss CHAdeMO chargers
+
+# Every night: all public CHAdeMO stations in Switzerland from the federal open data, JOYA marked,
+# saved as data/ch-chademo.json for the web app. Commits only when something changed.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/ch_chademo.py
+      - name: Save if changed
+        run: |
+          git add data/ch-chademo.json
+          if git diff --cached --quiet -- data/ch-chademo.json ':(exclude)'; then echo "no change"; exit 0; fi
+          python3 - <<'PY'
+          import json, subprocess
+          new = json.load(open("data/ch-chademo.json"))
+          try:
+              old = json.loads(subprocess.run(["git", "show", "HEAD:data/ch-chademo.json"], capture_output=True, text=True).stdout)
+          except Exception:
+              old = {}
+          same = old.get("stations") == new.get("stations")
+          open("/tmp/same", "w").write("1" if same else "0")
+          PY
+          if [ "$(cat /tmp/same)" = "1" ]; then echo "only the date changed"; exit 0; fi
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -m "Swiss CHAdeMO chargers: daily update"
+          git push
