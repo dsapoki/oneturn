@@ -48,8 +48,9 @@ def main():
                 continue
             acc = str(e.get("Accessibility") or "")
             access[acc] += 1
-            if re.search(r"private|restricted", acc, re.I):   # only stations anyone can use
+            if re.search(r"private", acc, re.I):
                 continue
+            restricted = bool(re.search(r"restricted", acc, re.I))   # e.g. customers only, opening hours: kept, marked
             try:
                 lat, lon = [float(v) for v in e["GeoCoordinates"]["Google"].split()]
             except (KeyError, ValueError, AttributeError):
@@ -61,13 +62,14 @@ def main():
             ad = e.get("Address") if isinstance(e.get("Address"), dict) else {}
             found.append(dict(i=e.get("ChargingStationId") or e.get("EvseID"), n=nm, lat=round(lat, 6), lon=round(lon, 6),
                               a=", ".join(x for x in [ad.get("Street"), ad.get("City")] if x),
-                              o=("JOYA (" + brand + ")") if joya else op_name, j=1 if joya else 0, k=dc_kw(e), q=1))
+                              o=("JOYA (" + brand + ")") if joya else op_name, j=1 if joya else 0, k=dc_kw(e), q=1,
+                              **({"r": 1} if restricted else {})))
     # one entry per site: same network within about 40 m
     found.sort(key=lambda s: (s["o"], s["lat"], s["lon"]))
     sites = []
     for s in found:
         for t in sites:
-            if (t["o"] == s["o"] and abs(t["lat"] - s["lat"]) * 111320 < 40
+            if (t["o"] == s["o"] and t.get("r") == s.get("r") and abs(t["lat"] - s["lat"]) * 111320 < 40
                     and abs(t["lon"] - s["lon"]) * 111320 * math.cos(math.radians(s["lat"])) < 40):
                 t["q"] += 1
                 t["k"] = max(t["k"], s["k"])
