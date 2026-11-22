@@ -16,20 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 tools/ch_chademo.py
-      - name: Save if changed
+      - name: Save if the stations changed
         run: |
+          if git show HEAD:data/ch-chademo.json > /tmp/old.json 2>/dev/null && python3 -c "import json,sys; a=json.load(open('/tmp/old.json')).get('stations'); b=json.load(open('data/ch-chademo.json'))['stations']; sys.exit(0 if a == b else 1)"; then echo "no change"; exit 0; fi
           git add data/ch-chademo.json
-          if git diff --cached --quiet -- data/ch-chademo.json ':(exclude)'; then echo "no change"; exit 0; fi
-          python3 - <<'PY'
-          import json, subprocess
-          new = json.load(open("data/ch-chademo.json"))
-          try:
-              old = json.loads(subprocess.run(["git", "show", "HEAD:data/ch-chademo.json"], capture_output=True, text=True).stdout)
-          except Exception:
-              old = {}
-          same = old.get("stations") == new.get("stations")
-          open("/tmp/same", "w").write("1" if same else "0")
-          PY
-          if [ "$(cat /tmp/same)" = "1" ]; then echo "only the date changed"; exit 0; fi
           git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -m "Swiss CHAdeMO chargers: daily update"
           git push
